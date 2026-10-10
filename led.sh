@@ -6,12 +6,31 @@
 # - 拒否・中断は hook に流れないため、ダイアログ表示中だけトランスクリプトを
 #   監視して痕跡(拒否の tool_result / 中断メッセージ)を検知したら赤を解除する
 # - 手動実行(tty)時は stdin を読まず sid=default で送る
+# - IP に届かなければ mDNS 名で引き直して再送する(DHCP 予約ができないルーター向け)
 
 # ↓ 自分の Atom Lite の固定 IP に書き換える
 ATOM_URL="http://192.168.1.50"
+# IP が変わったときに引き直す mDNS 名(ファームの HOSTNAME + .local)。空にすると無効
+ATOM_MDNS="atom.local"
+ATOM_URL_CACHE="${TMPDIR:-/tmp}/claude-led-atom-url"
+[ -s "$ATOM_URL_CACHE" ] && ATOM_URL=$(cat "$ATOM_URL_CACHE")
 
 now_ms() { perl -MTime::HiRes=time -e 'printf("%.0f", time()*1000)' 2>/dev/null || echo 0; }
-send_state() { curl -s -m 1 --retry 2 --retry-all-errors "$ATOM_URL/led?s=$1&sid=${2:-default}&ts=$(now_ms)" >/dev/null 2>&1; }
+
+# 通常は IP 直打ち(mDNS の初回解決は Windows で 2〜3 秒かかり -m 1 に収まらないため)。
+# 届かないときだけ mDNS で現在の IP を引き直してキャッシュし、同じ内容を再送する。
+# 本体の電源断などで引けなかった場合は 60 秒間引き直しを止め、hook ごとの待ちを積み上げない
+send_state() {
+  local q="led?s=$1&sid=${2:-default}&ts=$(now_ms)" fail="$ATOM_URL_CACHE.fail" ip
+  curl -s -m 1 --retry 2 --retry-all-errors "$ATOM_URL/$q" >/dev/null 2>&1 && return 0
+  [ -n "$ATOM_MDNS" ] || return 1
+  [ -n "$(find "$fail" -mmin -1 2>/dev/null)" ] && return 1
+  ip=$(curl -s -m 5 -o /dev/null -w '%{remote_ip}' "http://$ATOM_MDNS/" 2>/dev/null)
+  if [ -z "$ip" ]; then touch "$fail"; return 1; fi
+  printf 'http://%s' "$ip" > "$ATOM_URL_CACHE.$$" && mv -f "$ATOM_URL_CACHE.$$" "$ATOM_URL_CACHE"
+  ATOM_URL="http://$ip"
+  curl -s -m 1 --retry 2 --retry-all-errors "$ATOM_URL/$q" >/dev/null 2>&1
+}
 file_size() { stat -f%z "$1" 2>/dev/null || stat -c%s "$1" 2>/dev/null || echo 0; }
 
 # ダイアログ応答待ちの間、トランスクリプト(JSONL)の追記分を 1 秒間隔で監視する。
