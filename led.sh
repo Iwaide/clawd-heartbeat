@@ -12,7 +12,7 @@ ATOM_URL="http://192.168.1.50"
 
 now_ms() { perl -MTime::HiRes=time -e 'printf("%.0f", time()*1000)' 2>/dev/null || echo 0; }
 send_state() { curl -s -m 1 --retry 2 --retry-all-errors "$ATOM_URL/led?s=$1&sid=${2:-default}&ts=$(now_ms)" >/dev/null 2>&1; }
-file_size() { stat -f%z "$1" 2>/dev/null || stat -c%s "$1" 2>/dev/null || echo 0; }
+file_size() { stat -c%s "$1" 2>/dev/null || stat -f%z "$1" 2>/dev/null || echo 0; }
 
 # ダイアログ応答待ちの間、トランスクリプト(JSONL)の追記分を 1 秒間隔で監視する。
 # 「No で拒否」「Ctrl+C で中断」はどの hook イベントも発火しない(実測)が、
@@ -56,7 +56,9 @@ if [ ! -t 0 ]; then
 
   # マーカーの TTL(10分): 解除イベントの取りこぼしで赤が永続しないように
   if [ -f "$marker" ]; then
-    age=$(( $(date +%s) - $(stat -f %m "$marker" 2>/dev/null || stat -c %Y "$marker" 2>/dev/null || echo 0) ))
+    # GNU 形式を先に試す: GNU stat の -f はファイルシステム情報を出力してから失敗するため、
+    # BSD 形式が先だと出力が混ざって算術式が壊れる(Linux / Git Bash)
+    age=$(( $(date +%s) - $(stat -c %Y "$marker" 2>/dev/null || stat -f %m "$marker" 2>/dev/null || echo 0) ))
     [ "$age" -gt 600 ] && rm -f "$marker"
   fi
 
