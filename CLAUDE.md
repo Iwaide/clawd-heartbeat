@@ -20,6 +20,7 @@ A physical Claude Code status indicator: M5Atom Lite firmware (PlatformIO/C++) +
 ## Hard constraints (do not change casually)
 
 - `platform = espressif32@6.9.0` is pinned — newer platforms break with Arduino core 3.x. If resolution fails, tell the user; do not bump
+- `fastled/FastLED@3.7.8` is pinned — `^3.6.0` resolved to FastLED 3.10.6, which builds fine on this platform but the LED stops updating while the web server keeps answering, so `led-test.sh status` looks healthy. If you change it, confirm by eye that `led-test.sh rgb` changes the color
 - No `delay()` in `loop()` — animations are `millis()`-based; delay stalls the web server
 - WiFi credentials live only in `include/secrets.h` (gitignored). Never commit real credentials, device IPs, or MAC addresses — personal values go in gitignored `docs/LOCAL.md` / `.atom-ip`
 - If both `led.sh` here and `~/.claude/led.sh` exist, keep them in sync when editing

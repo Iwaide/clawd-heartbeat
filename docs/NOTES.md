@@ -179,5 +179,8 @@ permission prompt はトランスクリプトに記録されず(同ツールの 
   (PlatformIO 同梱の python: `/opt/homebrew/Cellar/platformio/*/libexec/bin/python`)
 - `platform = espressif32@6.9.0` 固定は Espressif が PlatformIO 公式プラットフォームの
   保守を終了しているため。最新にすると Arduino core 3.x との噛み合わせでビルドが通らないことがある
+- FastLED も `3.7.8` に固定している。`^3.6.0` 指定だと最新版(確認時点で 3.10.6)が入り、この platform
+  (Arduino core 2.0.17) ではビルドは通るが LED が更新されなくなる(Web サーバーは応答し続けるので
+  `led-test.sh status` では正常に見える)。上げる場合は `led-test.sh rgb` で色が変わることを目視確認する
 - `loop()` に `delay()` を入れない(handleClient が止まる)。点滅は全て `millis()` 差分で描画
 - 起動時の WiFi 接続中インジケータは紫の常灯(tool の白い呼吸とは動きで区別)
